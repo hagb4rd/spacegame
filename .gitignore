@@ -1,0 +1,40 @@
+lib-cov
+tmp
+*.seed
+*.log
+*.csv
+*.dat
+*.out
+*.pid
+*.gz
+*.bat
+*.sh
+*.swp
+
+pids
+results
+tmp
+coverage
+
+# API keys
+*.env
+
+# Dependency directory
+node_modules
+bower_components
+
+# Editors
+.idea
+.vscode
+*.iml
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Backup directory
+git-ignore
+.backup
+
+# SQLite
+*.sqlite
