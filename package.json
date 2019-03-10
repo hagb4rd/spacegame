@@ -1,0 +1,24 @@
+{
+  "name": "ea-spacegame",
+  "version": "1.0.0",
+  "description": "demo html5 game",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hagb4rd/spacegame.git"
+  },
+  "keywords": [
+    "game",
+    "html5",
+    "canvas"
+  ],
+  "author": "hagb4rd@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hagb4rd/spacegame/issues"
+  },
+  "homepage": "https://github.com/hagb4rd/spacegame#readme"
+}

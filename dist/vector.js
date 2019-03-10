@@ -1,7 +1,9 @@
 //var {inspect}=require('util');
+var module = module || { exports: this };
+var exports = exports || module.exports
 
-var deg = x => x/(2*Math.PI/360)
-var rad = phi => phi*(2*Math.PI/360);
+var deg = exports.deg = x => x/(2*Math.PI/360);
+var rad = exports.rad = phi => phi*(2*Math.PI/360);
 
 var map360=x=>x<0?360+x:x;
 var map2PI=x=>x<0?2*Math.PI+x:x;
@@ -53,8 +55,8 @@ class Vector extends Array {
     return this.create([Math.cos(rad(degree)),Math.sin(rad(degree))]);
   }
 
-  static scale(k, v) {
-    return Vector.create(v.map((a,i)=>k*a));
+  static scale(k, v1) {
+    return Vector.create(v1.map((a,i)=>k*a));
   }
 
   scale(k) {
@@ -68,9 +70,9 @@ class Vector extends Array {
     return vs.slice(1).reduce((v1,v2)=>v1.subtract(v2),v3);
   }
 
-  subtract(v) {
+  subtract(v1) {
     for(var i=0;i<this.length;i++)
-      this[i] -= v[i];
+      this[i] -= v1[i];
     return this;
   }
 
@@ -79,9 +81,9 @@ class Vector extends Array {
     return vs.reduce((v1,v2)=>v1.add(v2), v3);
   }
 
-  add(v) {
+  add(v1) {
     for(var i=0;i<this.length;i++)
-      this[i] += v[i];
+      this[i] += v1[i];
     return this;
   }
 
@@ -101,12 +103,12 @@ class Vector extends Array {
     return Vector.size(this)
   }
 
-  static norm(v) {
-    var len = v.size;
+  static norm(v1) {
+    var len = v1.size;
     var k = (len === 0) 
       ? 0 
       : 1.0 / len;
-    return Vector.scale(k, v);
+    return Vector.scale(k, v1);
   }
 
   get angle() {
@@ -128,7 +130,7 @@ class Vector extends Array {
     ]);
   }
 
-  cross(v2) {m
+  cross(v2) {
     return Vector.cross(this, v2);
   }
 

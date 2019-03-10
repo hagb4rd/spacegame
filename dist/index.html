@@ -1,7 +1,7 @@
 <html>
 <head>
 <title>spacegame</title>
-<script src="../webkit/webkit.min.js"></script>
+<script src="webkit.js"></script>
 <script src="vector.js"></script>
 <style>
 * {
@@ -13,7 +13,7 @@ html {
     color: #eee;
 }
 canvas {
-    position: absolute;
+    position: pos;
     top: 0;
     right: 0;
     bottom: 0;
@@ -29,21 +29,25 @@ canvas {
 <script>
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
-var screen = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    center: [window.innerWidth/2,window.innerHeight/2],
-    zoom: 1
+
+var controls = {
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  zoomin: false,
+  zoomout: false
 }
 var mouse = {
-    absolute: [0,0],
+    pos: [0,0],
     relative: [0,0],
     angle: 0,
-    update([x,y]){
-      this.absolute=[x,y];
-      this.relative=Vector.subtract(this.absolute,screen.center);
+    update(){
+      var [x,y]= this.pos;
+      this.relative=Vector.subtract(this.pos,screen.center);
       //this.angle=(this.relative.angle+Math.PI/2)%(Math.PI*2);
-      this.angle=(Vector.angle(this.relative)+Math.PI/2)%(Math.PI*2);
+      var angle=(Vector.angle(this.relative)+Math.PI/2)%(Math.PI*2);
+      this.angle = 2*Math.PI-angle;
     },
     draw(){
       ctx.font = '14pt Arial';
@@ -51,9 +55,6 @@ var mouse = {
       ctx.strokeText(`x: ${this.relative[0]} y: ${this.relative[1]} angle: ${deg(this.angle).toFixed(1)}`, 14, 14);
     }   
 }
-resize();
-
-var actors = [];
 
 
 
@@ -61,18 +62,50 @@ var actors = [];
 var ship = {
     pos: [0,0],
     angle: 0,
-    scale: 3,
+    scale: 1,
     velocity: [0,0],
     model: {
-        vertex:[[0,10],[7,-5],[0,-2],[-7,-5]],
+        //vertex:[[0,10],[7,-5],[0,-2],[-7,-5]],
+        vertex: [ 
+          [ 0, 30 ], //0
+          [ 21, -15 ], //1
+          [ 0, -6 ], //2
+          [ -21, -15 ] //3
+        ], 
         lines:[
-            [0,1,2,3,0]
+          [0,1,2,3,0]
         ]
     },
     update() {
-      this.pos=screen.center;
+      //this.pos=screen.center;
       this.angle=mouse.angle;
+      
     },
+
+    compute() {
+      var rotationMatrix=Matrix.rotation2D(this.angle);
+      var rotated=this.model.vertex.map(vertex=>rotationMatrix.multiplicate(vertex));
+      var translated=rotated.map(vertex=>Vector.add(vertex, this.pos));
+      return translated;
+    },
+    draw() {
+      
+      var vertices = this.compute();
+      var projection = vertices.map(vertex=>screen.projectionMatrix.multiplicate(vertex));
+      
+
+      this.model.lines.forEach(line => {
+        ctx.beginPath();
+        ctx.lineWidth = "2";
+        ctx.strokeStyle = "green";
+        var [x,y]=projection[line[0]];
+        ctx.moveTo(x,y);
+        line.slice(1).map(i=>projection[i]).forEach(([x,y])=>{
+          ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+      })
+    /*
     draw() {
       var mirrorY = this.model.vertex.map(([x,y])=>[x,-y]);
       var scaled=mirrorY.map(vertex=>Vector.scale(this.scale,vertex)); 
@@ -92,38 +125,67 @@ var ship = {
         });
         ctx.stroke();
       })
-
+      /* */
 
 
     }
 }
-var projectionMatrix = () => new Matrix([
-  [zoom, 0, (screen.center[0]+ship.pos[0])*zoom],
-  [0, -zoom, (screen.center[1]+ship.pos[1])*zoom],
-  [0, 0, zoom]
-])
+var screen = {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    center: [window.innerWidth/2,window.innerHeight/2],
+    pos: [0,0],
+    zoom: 1,
+    projectionMatrix: null,
+    update() {
+      this.pos = ship.pos;
+      this.width = canvas.width = window.innerWidth,
+      this.height = canvas.height = window.innerHeight,
+      this.center = [window.innerWidth/2,window.innerHeight/2]
+      this.projectionMatrix = new Matrix([
+        [this.zoom, 0, (this.center[0]+this.pos[0])*this.zoom],
+        [0, -this.zoom, (this.center[1]+this.pos[1])*this.zoom],
+        [0, 0, this.zoom]
+      ]);
+    },
+    draw() {
 
+    }
+}
 
+function projectionMatrix({pos,zoom,center}) { 
+  return new Matrix([
+    [zoom, 0, (center[0]+pos[0])*zoom],
+    [0, -zoom, (center[1]+pos[1])*zoom],
+    [0, 0, zoom]
+  ]);
+};
+
+resize();
 loop();
 
 
 function loop() {
   ctx.clearRect(0, 0, screen.width, screen.height);
-  mouse.draw();
-  ship.update();
-  ship.draw();
+  var actors = [mouse, ship, screen];
+
+  //update
+  actors.forEach(actor=>actor.update());
+  //.. & draw
+  actors.forEach(actor=>actor.draw());
+  
   requestAnimationFrame(loop);
 }
 
 
 function touch(e) {
   var {pageX:x, pageY:y} = e.originalEvent.touches[0];
-  mouse.update([x,y]);
+  mouse.pos = [x,y];
 }
 
 function mousemove(e) {
   var {pageX:x, pageY:y} = e;
-  mouse.update([x,y]);
+  mouse.pos = [x,y];
 }
 
 function resize() {
@@ -136,6 +198,9 @@ window.addEventListener('resize', resize);
 window.addEventListener('touchstart', touch);
 window.addEventListener('touchmove', touch);
 window.addEventListener('mousemove', mousemove);
+window.addEventListener('keydown', console.log);
+window.addEventListener('keyup', console.log);
+
 
 </script>
 </body>
