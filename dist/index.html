@@ -3,6 +3,7 @@
 <title>spacegame</title>
 <script src="webkit.js"></script>
 <script src="vector.js"></script>
+<script src="actor.js"></script>
 <style>
 * {
     margin: 0;
@@ -29,6 +30,10 @@ canvas {
 <script>
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
+var Actor=module.Actor({
+  ctx: ctx
+})
+
 
 var controls = {
   up: false,
@@ -58,78 +63,26 @@ var mouse = {
 
 
 
-
-var ship = {
-    pos: [0,0],
-    angle: 0,
-    scale: 1,
-    velocity: [0,0],
-    model: {
-        //vertex:[[0,10],[7,-5],[0,-2],[-7,-5]],
-        vertex: [ 
-          [ 0, 30 ], //0
-          [ 21, -15 ], //1
-          [ 0, -6 ], //2
-          [ -21, -15 ] //3
-        ], 
-        lines:[
-          [0,1,2,3,0]
-        ]
-    },
-    update() {
-      //this.pos=screen.center;
-      this.angle=mouse.angle;
-      
-    },
-
-    compute() {
-      var rotationMatrix=Matrix.rotation2D(this.angle);
-      var rotated=this.model.vertex.map(vertex=>rotationMatrix.multiplicate(vertex));
-      var translated=rotated.map(vertex=>Vector.add(vertex, this.pos));
-      return translated;
-    },
-    draw() {
-      
-      var vertices = this.compute();
-      var projection = vertices.map(vertex=>screen.projectionMatrix.multiplicate(vertex));
-      
-
-      this.model.lines.forEach(line => {
-        ctx.beginPath();
-        ctx.lineWidth = "2";
-        ctx.strokeStyle = "green";
-        var [x,y]=projection[line[0]];
-        ctx.moveTo(x,y);
-        line.slice(1).map(i=>projection[i]).forEach(([x,y])=>{
-          ctx.lineTo(x,y);
-        });
-        ctx.stroke();
-      })
-    /*
-    draw() {
-      var mirrorY = this.model.vertex.map(([x,y])=>[x,-y]);
-      var scaled=mirrorY.map(vertex=>Vector.scale(this.scale,vertex)); 
-      var rotationMatrix=Matrix.rotation2D(this.angle);
-      var rotated=scaled.map(vertex=>rotationMatrix.multiplicate(vertex));
-      var translated=rotated.map(vertex=>Vector.add(vertex, this.pos));
-      
-
-      this.model.lines.forEach(line => {
-        ctx.beginPath();
-        ctx.lineWidth = "2";
-        ctx.strokeStyle = "green";
-        var [x,y]=translated[line[0]];
-        ctx.moveTo(x,y);
-        line.slice(1).map(i=>translated[i]).forEach(([x,y])=>{
-          ctx.lineTo(x,y);
-        });
-        ctx.stroke();
-      })
-      /* */
-
-
-    }
+var ship = new Actor();
+ship.vertex = [
+    [ 0, 30 ], 
+    [ 21, -15 ], 
+    [ 0, -6 ], 
+    [ -21, -15 ]
+], 
+ship.lines = [
+    [0,1,2,3,0]
+];
+ship.velocity = [0,0];
+ship.update = function() {
+  this.angle=mouse.angle;
 }
+
+var testObject=new Actor();
+testObject.pos = [200,200];
+testObject.vertex = [[20,0],[20,-20],[-20,-20]];
+testObject.lines = [[0,1,2,0]];
+
 var screen = {
     width: window.innerWidth,
     height: window.innerHeight,
@@ -153,13 +106,6 @@ var screen = {
     }
 }
 
-function projectionMatrix({pos,zoom,center}) { 
-  return new Matrix([
-    [zoom, 0, (center[0]+pos[0])*zoom],
-    [0, -zoom, (center[1]+pos[1])*zoom],
-    [0, 0, zoom]
-  ]);
-};
 
 resize();
 loop();
@@ -167,7 +113,8 @@ loop();
 
 function loop() {
   ctx.clearRect(0, 0, screen.width, screen.height);
-  var actors = [mouse, ship, screen];
+  
+  var actors = [mouse, ship, testObject, screen];
 
   //update
   actors.forEach(actor=>actor.update());

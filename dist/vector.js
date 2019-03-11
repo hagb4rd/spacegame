@@ -5,8 +5,8 @@ var exports = exports || module.exports
 var deg = exports.deg = x => x/(2*Math.PI/360);
 var rad = exports.rad = phi => phi*(2*Math.PI/360);
 
-var map360=x=>x<0?360+x:x;
-var map2PI=x=>x<0?2*Math.PI+x:x;
+var map360=exports.map360=x=>x<0?360+x:x;
+var map2PI=exports.map2PI=x=>x<0?2*Math.PI+x:x;
 
 var angle=(u,v)=>Math.acos(Vector.dot(u,v)/u.size*v.size)
 
@@ -166,7 +166,7 @@ class Matrix {
     [Symbol.iterator]() {
       return this.rows[Symbol.iterator]();
     }
-    static rotation3D(roll=0, pitch=0, yaw=0) {
+    static rotation3D(roll=0, pitch=0, yaw=0, translate) {
 
       roll=rad(roll);
       pitch=rad(pitch);
@@ -181,13 +181,24 @@ class Matrix {
       var cosc = cos(-pitch);
       var sinc = sin(-pitch);
     
-      return new Matrix([
-        [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc],
-        [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc],
-        [-sinb, cosb*sinc, cosb*cosc]
-      ]);
+      if(translate){
+        var [x,y,z]=translate;
+        return new Matrix([
+          [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc, x],
+          [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc, y],
+          [-sinb, cosb*sinc, cosb*cosc, z],
+          [0, 0, 0, 1]
+        ]);
+      } else {
+        return new Matrix([
+          [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc],
+          [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc],
+          [-sinb, cosb*sinc, cosb*cosc]
+        ]);
+      }
+      
     }
-    static rotation2D(angle) {
+    static rotation2D(angle,translate) {
 
       if(typeof(v1)=='object') {
         var [cos, sin] = Vector.create(angle).norm();
@@ -199,10 +210,38 @@ class Matrix {
       var cosP=cos(phi);
       var sinP=sin(phi);
       /* */
-      return new Matrix([
-        [cos, -sin],
-        [sin, cos]
-      ]);
+      if(translate) {
+        
+        var [x,y]=translate;
+
+        return new Matrix([
+          [cos, -sin, x],
+          [sin, cos,  y],
+          [0, 0, 1]
+        ]);
+
+      } else {
+        return new Matrix([
+          [cos, -sin],
+          [sin, cos]
+        ]);  
+      }
+      
+    }
+    
+    get cols(){
+      var cols_=Array.from({length:this.rows[0].length},(e,i)=>i);
+      return cols_.map(i=>this.rows.map(row=>row[i]));
+
+    }
+    static product(A,B) {
+      var len=A.rows.length;
+      var C=[...Array(len)].map((e,i)=>[...Array(len)]);
+      for(var i=0;i<len;i++)
+        for(var j=0;j<len;j++)
+          C[i][j]=Vector.dot(A.rows[i],B.cols[j]);
+
+      return new Matrix(C);
     }
     multiplicate(v1) {
       var vlength=v1.length;
