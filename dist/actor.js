@@ -4,7 +4,7 @@ module['Actor']=(function({ctx}){
   }
   Actor.prototype = new $.EventTarget();
   Actor.prototype.constructor = Actor.constructor;
-  Actor.prototype.pos = [0,0];
+  Actor.prototype.pos = Vector.create([0,0]);
   Actor.prototype.angle = 0;
   Actor.prototype.vertex = [];
   Actor.prototype.lines = [];

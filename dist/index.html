@@ -1,7 +1,7 @@
 <html>
 <head>
 <title>spacegame</title>
-<script src="webkit.js"></script>
+<script src="https://unpkg.com/ea-webkit@latest/dist/webkit.min.js"></script>
 <script src="vector.js"></script>
 <script src="actor.js"></script>
 <style>
@@ -28,11 +28,15 @@ canvas {
 <body>
 <canvas></canvas> 
 <script>
+
+var progress, start, t;
+
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
 var Actor=module.Actor({
   ctx: ctx
 })
+
 
 
 var controls = {
@@ -57,7 +61,7 @@ var mouse = {
     draw(){
       ctx.font = '14pt Arial';
       ctx.strokeStyle = 'red';
-      ctx.strokeText(`x: ${this.relative[0]} y: ${this.relative[1]} angle: ${deg(this.angle).toFixed(1)}`, 14, 14);
+      ctx.strokeText(`t: ${progress.toFixed(2)} x: ${this.relative[0]} y: ${this.relative[1]} angle: ${deg(this.angle).toFixed(1)}`, 14, 14);
     }   
 }
 
@@ -73,14 +77,22 @@ ship.vertex = [
 ship.lines = [
     [0,1,2,3,0]
 ];
-ship.velocity = [0,0];
+ship.velocity = Vector.create([0,0]);
 ship.update = function() {
   this.angle=mouse.angle;
+  if(controls.up) {
+    var a=1;
+    var acceleration=[Math.cos(this.angle)*a,Math.sin(this.angle)*a];
+    var deltaV=[acceleration[0]*t,acceleration[1]*t];
+    this.velocity.add(deltaV);
+  }
+  var deltaPos=Vector.scale(t,this.velocity);
+  this.pos.add(deltaPos);
 }
 
 var testObject=new Actor();
-testObject.pos = [200,200];
-testObject.vertex = [[20,0],[20,-20],[-20,-20]];
+testObject.pos = Vector.create([200,200]);
+testObject.vertex = [[0,20],[10,-20],[-10,-20]];
 testObject.lines = [[0,1,2,0]];
 
 var screen = {
@@ -96,8 +108,8 @@ var screen = {
       this.height = canvas.height = window.innerHeight,
       this.center = [window.innerWidth/2,window.innerHeight/2]
       this.projectionMatrix = new Matrix([
-        [this.zoom, 0, (this.center[0]+this.pos[0])*this.zoom],
-        [0, -this.zoom, (this.center[1]+this.pos[1])*this.zoom],
+        [this.zoom, 0, this.center[0]+(this.pos[0]*this.zoom)],
+        [0, -this.zoom, this.center[1]+(this.pos[1]*this.zoom)],
         [0, 0, this.zoom]
       ]);
     },
@@ -111,13 +123,24 @@ resize();
 loop();
 
 
-function loop() {
+
+function loop(time) {
+
+  if (!start) start = time;
+  var tempProgress = (time - start) / 1000;
+  if(progress) {
+    t=tempProgress-progress;
+  } else {
+    t=0;
+  }
+  progress = tempProgress;
+
   ctx.clearRect(0, 0, screen.width, screen.height);
   
   var actors = [mouse, ship, testObject, screen];
 
   //update
-  actors.forEach(actor=>actor.update());
+  actors.forEach(actor=>actor.update(t));
   //.. & draw
   actors.forEach(actor=>actor.draw());
   
@@ -141,12 +164,24 @@ function resize() {
   screen.center = [window.innerWidth/2,window.innerHeight/2];
 }
 
+function onkeydown(e){
+  //console.log(e);
+  if(e.key=='ArrowUp')
+    controls.up=true;
+}
+
+function onkeyup(e){
+  //console.log(e);
+  if(e.key=='ArrowUp')
+    controls.up=false;
+}
+
 window.addEventListener('resize', resize);
 window.addEventListener('touchstart', touch);
 window.addEventListener('touchmove', touch);
 window.addEventListener('mousemove', mousemove);
-window.addEventListener('keydown', console.log);
-window.addEventListener('keyup', console.log);
+document.addEventListener('keydown', onkeydown);
+document.addEventListener('keyup', onkeyup);
 
 
 </script>
