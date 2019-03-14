@@ -14,7 +14,7 @@ html {
     color: #eee;
 }
 canvas {
-    position: pos;
+    position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
@@ -33,9 +33,7 @@ var progress, start, t;
 
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
-var Actor=module.Actor({
-  ctx: ctx
-})
+
 
 
 
@@ -53,37 +51,74 @@ var mouse = {
     angle: 0,
     update(){
       var [x,y]= this.pos;
-      this.relative=Vector.subtract(this.pos,screen.center);
+      this.relative=Vector.subtract(screen.center,this.pos);
+      this.relative=[-this.relative[0],this.relative[1]]
       //this.angle=(this.relative.angle+Math.PI/2)%(Math.PI*2);
-      var angle=(Vector.angle(this.relative)+Math.PI/2)%(Math.PI*2);
-      this.angle = 2*Math.PI-angle;
+      this.angle=Vector.angle([this.relative[0],this.relative[1]]);
+      //this.angle = 2*Math.PI-angle;
     },
     draw(){
       ctx.font = '14pt Arial';
       ctx.strokeStyle = 'red';
-      ctx.strokeText(`t: ${progress.toFixed(2)} x: ${this.relative[0]} y: ${this.relative[1]} angle: ${deg(this.angle).toFixed(1)}`, 14, 14);
+      
     }   
 }
+var screen = {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    center: [window.innerWidth/2,window.innerHeight/2],
+    pos: [0,0],
+    zoom: 1,
+    maxzoom: 4,
+    minzoom: 0.25,
+    projectionMatrix: null,
+    update() {
+      this.pos = ship.pos;
+      this.width = canvas.width = window.innerWidth,
+      this.height = canvas.height = window.innerHeight,
+      this.center = [window.innerWidth/2,window.innerHeight/2]
 
+      if(controls.zoomin)
+        this.zoom += t;
+      if(controls.zoomout)
+        this.zoom -= t;
+      if(this.zoom > this.maxzoom)
+        this.zoom = this.maxzoom;
+      if(this.zoom < this.minzoom)
+        this.zoom = this.minzoom;
 
+      var scale=Matrix.scale2D([this.zoom,-this.zoom])
+      var translate=Matrix.translate2D(Vector.add(this.center,Vector.scale(this.zoom,[-this.pos[0],this.pos[1]])));
+      this.projectionMatrix = Matrix.product(translate,scale);
+    },
+    draw() {
+      ctx.strokeText(`x: ${mouse.relative[0]} y: ${mouse.relative[1]} angle: ${mouse.angle.toFixed(1)}`, 14, 14);
+    }
+}
 
+var Actor=module.Actor({
+  ctx: ctx,
+  screen: screen,
+  controls: controls,
+  t: t
+})
 var ship = new Actor();
 ship.vertex = [
-    [ 0, 30 ], 
-    [ 21, -15 ], 
-    [ 0, -6 ], 
-    [ -21, -15 ]
+    [ 30, 0 ], 
+    [ -15, 21 ], 
+    [ -6, 0 ], 
+    [ -15, -21 ]
 ], 
 ship.lines = [
     [0,1,2,3,0]
 ];
+ship.acceleration=50;
 ship.velocity = Vector.create([0,0]);
 ship.update = function() {
   this.angle=mouse.angle;
   if(controls.up) {
-    var a=1;
-    var acceleration=[Math.cos(this.angle)*a,Math.sin(this.angle)*a];
-    var deltaV=[acceleration[0]*t,acceleration[1]*t];
+    var a = [Math.cos(this.angle)*this.acceleration,Math.sin(this.angle)*this.acceleration];
+    var deltaV=Vector.scale(t,a);
     this.velocity.add(deltaV);
   }
   var deltaPos=Vector.scale(t,this.velocity);
@@ -94,29 +129,6 @@ var testObject=new Actor();
 testObject.pos = Vector.create([200,200]);
 testObject.vertex = [[0,20],[10,-20],[-10,-20]];
 testObject.lines = [[0,1,2,0]];
-
-var screen = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    center: [window.innerWidth/2,window.innerHeight/2],
-    pos: [0,0],
-    zoom: 1,
-    projectionMatrix: null,
-    update() {
-      this.pos = ship.pos;
-      this.width = canvas.width = window.innerWidth,
-      this.height = canvas.height = window.innerHeight,
-      this.center = [window.innerWidth/2,window.innerHeight/2]
-      this.projectionMatrix = new Matrix([
-        [this.zoom, 0, this.center[0]+(this.pos[0]*this.zoom)],
-        [0, -this.zoom, this.center[1]+(this.pos[1]*this.zoom)],
-        [0, 0, this.zoom]
-      ]);
-    },
-    draw() {
-
-    }
-}
 
 
 resize();
@@ -168,12 +180,22 @@ function onkeydown(e){
   //console.log(e);
   if(e.key=='ArrowUp')
     controls.up=true;
+  if(e.key=='+')
+    if(!controls.zoomout)
+      controls.zoomin=true;
+  if(e.key=='-')
+    if(!controls.zoomin)
+      controls.zoomout=true;
 }
 
 function onkeyup(e){
   //console.log(e);
   if(e.key=='ArrowUp')
     controls.up=false;
+  if(e.key=='+')
+    controls.zoomin=false;
+  if(e.key=='-')
+    controls.zoomout=false;
 }
 
 window.addEventListener('resize', resize);

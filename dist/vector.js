@@ -112,10 +112,10 @@ class Vector extends Array {
   }
 
   get angle() {
-    return map2PI(Math.atan2(this[1],this[0])); 
+    return Math.atan2(this[1],this[0]); 
   }
   static angle(u) {
-    return map2PI(Math.atan2(u[1],u[0])); 
+    return Math.atan2(u[1],u[0]); 
   }
 
   norm() {
@@ -166,7 +166,7 @@ class Matrix {
     [Symbol.iterator]() {
       return this.rows[Symbol.iterator]();
     }
-    static rotation3D(roll=0, pitch=0, yaw=0, translate) {
+    static rotate3D(roll, pitch, yaw) {
 
       roll=rad(roll);
       pitch=rad(pitch);
@@ -181,24 +181,30 @@ class Matrix {
       var cosc = cos(-pitch);
       var sinc = sin(-pitch);
     
-      if(translate){
-        var [x,y,z]=translate;
-        return new Matrix([
-          [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc, x],
-          [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc, y],
-          [-sinb, cosb*sinc, cosb*cosc, z],
-          [0, 0, 0, 1]
-        ]);
-      } else {
-        return new Matrix([
-          [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc],
-          [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc],
-          [-sinb, cosb*sinc, cosb*cosc]
-        ]);
-      }
-      
+      return new Matrix([
+        [cosa*cosb, cosa*sinb*sinc - sina*cosc, cosa*sinb*cosc + sina*sinc, 0],
+        [sina*cosb, sina*sinb*sinc + cosa*cosc, sina*sinb*cosc - cosa*sinc, 0],
+        [-sinb, cosb*sinc, cosb*cosc, 0],
+        [0, 0, 0, 1]
+      ]);  
     }
-    static rotation2D(angle,translate) {
+    static translate3D([x,y,z]) {
+      return new Matrix([
+        [1,0,0,x],
+        [0,1,0,y],
+        [0,0,1,z],
+        [0,0,0,1]
+      ])
+    }
+    static scale3D([x,y,z]){
+      return new Matrix([
+        [x,0,0,0],
+        [0,y,0,0],
+        [0,0,z,0],
+        [0,0,0,1]
+      ])
+    }
+    static rotate2D(angle) {
 
       if(typeof(v1)=='object') {
         var [cos, sin] = Vector.create(angle).norm();
@@ -206,27 +212,27 @@ class Matrix {
         var sin=Math.sin(angle);
         var cos=Math.cos(angle);
       }
-      /*
-      var cosP=cos(phi);
-      var sinP=sin(phi);
-      /* */
-      if(translate) {
-        
-        var [x,y]=translate;
 
-        return new Matrix([
-          [cos, -sin, x],
-          [sin, cos,  y],
-          [0, 0, 1]
-        ]);
+      return new Matrix([
+        [cos, -sin, 0],
+        [sin, cos, 0],
+        [0, 0, 1]
+      ]);        
+    }
 
-      } else {
-        return new Matrix([
-          [cos, -sin],
-          [sin, cos]
-        ]);  
-      }
-      
+    static translate2D([x,y]) {
+      return new Matrix ([
+        [1,0,x],
+        [0,1,y],
+        [0,0,1]
+      ])
+    }
+    static scale2D([x,y]) {
+      return new Matrix ([
+        [x,0,0],
+        [0,y,0],
+        [0,0,1]
+      ])
     }
     
     get cols(){
@@ -235,13 +241,18 @@ class Matrix {
 
     }
     static product(A,B) {
-      var len=A.rows.length;
-      var C=[...Array(len)].map((e,i)=>[...Array(len)]);
-      for(var i=0;i<len;i++)
-        for(var j=0;j<len;j++)
-          C[i][j]=Vector.dot(A.rows[i],B.cols[j]);
+      if(Array.isArray(A)) {
+        return A.reduce((a,b)=>this.product(a,b));
+      } else {
+        var len=A.rows.length;
+        var C=[...Array(len)].map((e,i)=>[...Array(len)]);
+        for(var i=0;i<len;i++)
+          for(var j=0;j<len;j++)
+            C[i][j]=Vector.dot(A.rows[i],B.cols[j]);
 
-      return new Matrix(C);
+        return new Matrix(C);
+      }
+      
     }
     multiplicate(v1) {
       var vlength=v1.length;
