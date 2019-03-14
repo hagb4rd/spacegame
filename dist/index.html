@@ -29,7 +29,7 @@ canvas {
 <canvas></canvas> 
 <script>
 
-var progress, start, t;
+var progress, start, t, actors = [];
 
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
@@ -58,8 +58,6 @@ var mouse = {
       //this.angle = 2*Math.PI-angle;
     },
     draw(){
-      ctx.font = '14pt Arial';
-      ctx.strokeStyle = 'red';
       
     }   
 }
@@ -73,7 +71,9 @@ var screen = {
     minzoom: 0.25,
     projectionMatrix: null,
     update() {
-      this.pos = ship.pos;
+      this.pos = typeof(ship)=='undefined' 
+        ? Vector.create([0,0])
+        : ship.pos;
       this.width = canvas.width = window.innerWidth,
       this.height = canvas.height = window.innerHeight,
       this.center = [window.innerWidth/2,window.innerHeight/2]
@@ -92,16 +92,12 @@ var screen = {
       this.projectionMatrix = Matrix.product(translate,scale);
     },
     draw() {
-      ctx.strokeText(`x: ${mouse.relative[0]} y: ${mouse.relative[1]} angle: ${mouse.angle.toFixed(1)}`, 14, 14);
+      ctx.font = '14pt Arial';
+      ctx.strokeStyle = 'red';
+      ctx.strokeText(`pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(mouse.angle).toFixed(1)}`, 14, 14);
     }
 }
-
-var Actor=module.Actor({
-  ctx: ctx,
-  screen: screen,
-  controls: controls,
-  t: t
-})
+screen.update();
 var ship = new Actor();
 ship.vertex = [
     [ 30, 0 ], 
@@ -112,22 +108,49 @@ ship.vertex = [
 ship.lines = [
     [0,1,2,3,0]
 ];
-ship.acceleration=50;
+//ship.radius = Vector.create(ship.vertex[0]).size;
+ship.acceleration=60;
+ship.friction=5;
 ship.velocity = Vector.create([0,0]);
+ship.maxvelocity = 400;
 ship.update = function() {
   this.angle=mouse.angle;
+  //friction
+  var deltaV = Vector.scale(-1*t/this.friction,this.velocity);
+  this.velocity.add(deltaV)
+   
+  
   if(controls.up) {
     var a = [Math.cos(this.angle)*this.acceleration,Math.sin(this.angle)*this.acceleration];
     var deltaV=Vector.scale(t,a);
     this.velocity.add(deltaV);
+    if(this.velocity.size > this.maxvelocity)
+      this.velocity.subtract(deltaV);
   }
+  
+  /*
+  if(this.velocity[0]<0)
+    this.velocity[0]=0;
+  if(this.velocity[1]<0)
+    this.velocity[1]=0;
+  */
   var deltaPos=Vector.scale(t,this.velocity);
   this.pos.add(deltaPos);
+  
+  this.compute();
+  actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
+    if(Actor.isCollision(this, actor)) {
+      actor.color="red";
+    }
+  })
 }
 
 var testObject=new Actor();
+testObject.detectCollisions=true;
 testObject.pos = Vector.create([200,200]);
-testObject.vertex = [[0,20],[10,-20],[-10,-20]];
+
+testObject.vertex = [[10,-20],[-10,-20],[0,20]];
+//testObject.radius = Vector.create(testObject.vertex[0]).size;
 testObject.lines = [[0,1,2,0]];
 
 
@@ -149,7 +172,9 @@ function loop(time) {
 
   ctx.clearRect(0, 0, screen.width, screen.height);
   
-  var actors = [mouse, ship, testObject, screen];
+  actors = [screen, mouse, testObject];
+
+  actors.push(ship);
 
   //update
   actors.forEach(actor=>actor.update(t));
@@ -196,6 +221,10 @@ function onkeyup(e){
     controls.zoomin=false;
   if(e.key=='-')
     controls.zoomout=false;
+}
+
+function onclick(e){
+  ship.fire();
 }
 
 window.addEventListener('resize', resize);
