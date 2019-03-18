@@ -30,13 +30,8 @@ canvas {
 <script>
 
 var progress, start, t, actors = [];
-
 var canvas=document.querySelector('canvas');
 var ctx=canvas.getContext('2d');
-
-
-
-
 var controls = {
   up: false,
   down: false,
@@ -89,7 +84,7 @@ var screen = {
 
       var scale=Matrix.scale2D([this.zoom,-this.zoom])
       var translate=Matrix.translate2D(Vector.add(this.center,Vector.scale(this.zoom,[-this.pos[0],this.pos[1]])));
-      this.projectionMatrix = Matrix.product(translate,scale);
+      this.projectionMatrix = Matrix.product(scale,translate);
     },
     draw() {
       ctx.font = '14pt Arial';
@@ -97,90 +92,42 @@ var screen = {
       ctx.strokeText(`pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(mouse.angle).toFixed(1)}`, 14, 14);
     }
 }
-screen.update();
-var ship = new Actor();
-ship.vertex = [
-    [ 30, 0 ], 
-    [ -15, 21 ], 
-    [ -6, 0 ], 
-    [ -15, -21 ]
-], 
-ship.lines = [
-    [0,1,2,3,0]
-];
-//ship.radius = Vector.create(ship.vertex[0]).size;
-ship.acceleration=60;
-ship.friction=6;
-ship.velocity = Vector.create([0,0]);
-ship.maxvelocity = 400;
-ship.update = function() {
-  this.angle=mouse.angle;
-  //friction
-  var deltaV = Vector.scale(-1*t/this.friction,this.velocity);
-  this.velocity.add(deltaV)
-   
-  
-  if(controls.up) {
-    var a = [Math.cos(this.angle)*this.acceleration,Math.sin(this.angle)*this.acceleration];
-    var deltaV=Vector.scale(t,a);
-    this.velocity.add(deltaV);
-    if(this.velocity.size > this.maxvelocity)
-      this.velocity.subtract(deltaV);
-  }
-  
-  /*
-  if(this.velocity[0]<0)
-    this.velocity[0]=0;
-  if(this.velocity[1]<0)
-    this.velocity[1]=0;
-  */
-  var deltaPos=Vector.scale(t,this.velocity);
-  this.pos.add(deltaPos);
-  
-  this.compute();
-  actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
-    if(Actor.isCollision(this, actor)) {
-      actor.color="red";
-    }
-  })
-}
 
+var ship = new Ship();
 var testObject=new Actor();
 testObject.detectCollisions=true;
 testObject.pos = Vector.create([200,200]);
-
 testObject.vertex = [[10,-20],[-10,-20],[0,20]];
 //testObject.radius = Vector.create(testObject.vertex[0]).size;
 testObject.lines = [[0,1,2,0]];
-
-
-resize();
+//resize();
 loop();
 
 
 
 function loop(time) {
-
+  //update time
   if (!start) start = time;
-  var tempProgress = (time - start) / 1000;
-  if(progress) {
-    t=tempProgress-progress;
-  } else {
-    t=0;
-  }
-  progress = tempProgress;
+  var swap = (time - start) / 1000;
+  t=progress?swap-progress:0;
+  progress = swap;
 
-  ctx.clearRect(0, 0, screen.width, screen.height);
-  
-  actors = [screen, mouse, testObject];
+  //screen 
+  screen.update();
+  mouse.update();
 
-  actors.push(ship);
+  actors = [testObject];
 
-  //update
+  //update all actors
   actors.forEach(actor=>actor.update(t));
+  //update ship
+  ship.update();
+
   //.. & draw
+  screen.draw();
   actors.forEach(actor=>actor.draw());
-  
+  ship.draw();
+
   requestAnimationFrame(loop);
 }
 
@@ -196,9 +143,12 @@ function mousemove(e) {
 }
 
 function resize() {
+  screen.update();
+  /*
   screen.width = canvas.width = window.innerWidth;
   screen.height = canvas.height = window.innerHeight;
   screen.center = [window.innerWidth/2,window.innerHeight/2];
+  */
 }
 
 function onkeydown(e){

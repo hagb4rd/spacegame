@@ -256,7 +256,7 @@ class Matrix {
         var C=[...Array(len)].map((e,i)=>[...Array(len)]);
         for(var i=0;i<len;i++)
           for(var j=0;j<len;j++)
-            C[i][j]=Vector.dot(A.rows[i],B.cols[j]);
+            C[i][j]=Vector.dot(B.rows[i],A.cols[j]);
 
         return new Matrix(C);
       }
@@ -264,14 +264,6 @@ class Matrix {
     }
     multiplicate(v1) {
       var vlength=v1.length;
-      /*
-      if(this.rows.length>v1.length) {
-        var v2=Vector.create(v1);
-        for(var i=v1.length;i<=this.rows.length; i++) {
-          v[i]=1;
-        }
-      }
-      */
       return Vector.create(this.rows.map(row=>Vector.dot(row,v1)).slice(0,vlength));
     }
 }
