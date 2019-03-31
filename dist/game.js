@@ -3,6 +3,7 @@ var Game = function() {
     progress: 0,
     start: 0,
     t: 0,
+	fps: 0,
     actors: []
   }
   game.add = function(actor) {
@@ -68,7 +69,7 @@ var Game = function() {
       draw() {
         ctx.font = '14pt Arial';
         ctx.strokeStyle = 'red';
-        ctx.strokeText(`pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(game.mouse.angle).toFixed(1)}`, 14, 14);
+        ctx.strokeText(`fps: ${game.fps} pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(game.mouse.angle).toFixed(1)}`, 14, 14);
       }
   }
 
@@ -87,6 +88,15 @@ var Game = function() {
     var swap = (time - game.start) / 1000;
     game.t=game.progress?swap-game.progress:0;
     game.progress = swap;
+	game.framecount++;
+	game.timeUntilSecond=game.timeUntilSecond||0;
+	game.timeUntilSecond+=game.t;
+	if(game.timeUntilSecond > 1) {
+		game.fps = game.framecount;
+		game.framecount = 0
+		game.timeUntilSecond = 0;
+	}		
+	
 
     //screen 
     game.screen.update(game.t);
