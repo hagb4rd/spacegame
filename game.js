@@ -26,10 +26,10 @@ var Game = function() {
       angle: 0,
       update(){
         var [x,y]= this.pos;
-        this.relative=Vector.subtract(game.screen.center,this.pos);
+        this.relative=v.subtract(game.screen.center,this.pos);
         this.relative=[-this.relative[0],this.relative[1]]
         //this.angle=(this.relative.angle+Math.PI/2)%(Math.PI*2);
-        this.angle=Vector.angle([this.relative[0],this.relative[1]]);
+        this.angle=v.angle([this.relative[0],this.relative[1]]);
         //this.angle = 2*Math.PI-angle;
       },
       draw(){
@@ -47,7 +47,7 @@ var Game = function() {
       projectionMatrix: null,
       update() {
         this.pos = typeof(ship)=='undefined' 
-          ? Vector.create([0,0])
+          ? v.create([0,0])
           : ship.pos;
         this.width = canvas.width = window.innerWidth,
         this.height = canvas.height = window.innerHeight,
@@ -62,9 +62,9 @@ var Game = function() {
         if(this.zoom < this.minzoom)
           this.zoom = this.minzoom;
 
-        var scale=Matrix.scale2D([this.zoom,-this.zoom])
-        var translate=Matrix.translate2D(Vector.add(this.center,Vector.scale(this.zoom,[-this.pos[0],this.pos[1]])));
-        this.projectionMatrix = Matrix.product(scale,translate);
+        var scale=matrix2d.scale([this.zoom,-this.zoom])
+        var translate=matrix2d.translate(v.add(this.center,v.scale(this.zoom,[-this.pos[0],this.pos[1]])));
+        this.projectionMatrix = matrix2d.product(scale,translate);
       },
       draw() {
         ctx.font = '14pt Arial';
@@ -77,9 +77,9 @@ var Game = function() {
   ship.parent=game;
   var testObject=new Actor();
   testObject.detectCollisions=true;
-  testObject.pos = Vector.create([200,200]);
+  testObject.pos = [200,200];
   testObject.vertex = [[10,-20],[-10,-20],[0,20]];
-  //testObject.radius = Vector.create(testObject.vertex[0]).size;
+  //testObject.radius = v.create(testObject.vertex[0]).size;
   testObject.lines = [[0,1,2,0]];
   game.add(testObject);
   game.loop = (function(time) {

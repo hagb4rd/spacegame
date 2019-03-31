@@ -74,8 +74,15 @@ var matrix2d = () => [
 	[0,1,0],
 	[0,0,1]
 ]
-matrix2d.star = (A) {
-	var B=matrix();
+matrix2d.star = (A) => {
+	var B=matrix2d();
+	for(let i=0;i<A.length;i++) 
+		for(let j=0;j<A[i].length;j++)
+			B[j][i]=A[i][j];
+	return B;
+}
+matrix3d.star = (A) => {
+	var B=matrix3d();
 	for(let i=0;i<A.length;i++) 
 		for(let j=0;j<A[i].length;j++)
 			B[j][i]=A[i][j];
@@ -83,7 +90,7 @@ matrix2d.star = (A) {
 }
 matrix3d.star=matrix2d.star;
 
-matrix3d.rotate => (roll, pitch, yaw) => {
+matrix3d.rotate = (roll, pitch, yaw) => {
 
   roll=rad(roll);
   pitch=rad(pitch);
@@ -122,8 +129,8 @@ matrix2d.rotate = (angle) => {
 	var sina=Math.sin(angle);
 	var cosa=Math.cos(angle);
 	return [
-		[cos, -sin, 0],
-		[sin, cos, 0],
+		[cosa, -sina, 0],
+		[sina, cosa, 0],
 		[0, 0, 1]
 	];
 };	
@@ -155,3 +162,5 @@ matrix3d.product = (A,B) => {
 		C[i][j]=v.dot(B[i],Astar[j]);
     return C;
 }
+matrix2d.multiplicate = (M,v1) => M.map(row=>v.dot(row,v1)).slice(0,2);
+matrix3d.multiplicate = (M,v1) => M.map(row=>v.dot(row,v1)).slice(0,3);
