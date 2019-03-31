@@ -1,9 +1,10 @@
 <html>
 <head>
 <title>spacegame</title>
-<script src="https://unpkg.com/ea-webkit@latest/dist/webkit.min.js"></script>
+<script src="webkit.min.js"></script>
 <script src="vector.js"></script>
 <script src="actor.js"></script>
+<script src="game.js" defer></script>
 <style>
 * {
     margin: 0;
@@ -28,161 +29,6 @@ canvas {
 <body>
 <canvas></canvas> 
 <script>
-
-var progress, start, t, actors = [];
-var canvas=document.querySelector('canvas');
-var ctx=canvas.getContext('2d');
-var controls = {
-  up: false,
-  down: false,
-  left: false,
-  right: false,
-  zoomin: false,
-  zoomout: false
-}
-var mouse = {
-    pos: [0,0],
-    relative: [0,0],
-    angle: 0,
-    update(){
-      var [x,y]= this.pos;
-      this.relative=Vector.subtract(screen.center,this.pos);
-      this.relative=[-this.relative[0],this.relative[1]]
-      //this.angle=(this.relative.angle+Math.PI/2)%(Math.PI*2);
-      this.angle=Vector.angle([this.relative[0],this.relative[1]]);
-      //this.angle = 2*Math.PI-angle;
-    },
-    draw(){
-      
-    }   
-}
-var screen = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    center: [window.innerWidth/2,window.innerHeight/2],
-    pos: [0,0],
-    zoom: 1,
-    maxzoom: 4,
-    minzoom: 0.25,
-    projectionMatrix: null,
-    update() {
-      this.pos = typeof(ship)=='undefined' 
-        ? Vector.create([0,0])
-        : ship.pos;
-      this.width = canvas.width = window.innerWidth,
-      this.height = canvas.height = window.innerHeight,
-      this.center = [window.innerWidth/2,window.innerHeight/2]
-
-      if(controls.zoomin)
-        this.zoom += t;
-      if(controls.zoomout)
-        this.zoom -= t;
-      if(this.zoom > this.maxzoom)
-        this.zoom = this.maxzoom;
-      if(this.zoom < this.minzoom)
-        this.zoom = this.minzoom;
-
-      var scale=Matrix.scale2D([this.zoom,-this.zoom])
-      var translate=Matrix.translate2D(Vector.add(this.center,Vector.scale(this.zoom,[-this.pos[0],this.pos[1]])));
-      this.projectionMatrix = Matrix.product(scale,translate);
-    },
-    draw() {
-      ctx.font = '14pt Arial';
-      ctx.strokeStyle = 'red';
-      ctx.strokeText(`pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(mouse.angle).toFixed(1)}`, 14, 14);
-    }
-}
-
-var ship = new Ship();
-var testObject=new Actor();
-testObject.detectCollisions=true;
-testObject.pos = Vector.create([200,200]);
-testObject.vertex = [[10,-20],[-10,-20],[0,20]];
-//testObject.radius = Vector.create(testObject.vertex[0]).size;
-testObject.lines = [[0,1,2,0]];
-//resize();
-loop();
-
-
-
-function loop(time) {
-  //update time
-  if (!start) start = time;
-  var swap = (time - start) / 1000;
-  t=progress?swap-progress:0;
-  progress = swap;
-
-  //screen 
-  screen.update();
-  mouse.update();
-
-  actors = [testObject];
-
-  //update all actors
-  actors.forEach(actor=>actor.update(t));
-  //update ship
-  ship.update();
-
-  //.. & draw
-  screen.draw();
-  actors.forEach(actor=>actor.draw());
-  ship.draw();
-
-  requestAnimationFrame(loop);
-}
-
-
-function touch(e) {
-  var {pageX:x, pageY:y} = e.originalEvent.touches[0];
-  mouse.pos = [x,y];
-}
-
-function mousemove(e) {
-  var {pageX:x, pageY:y} = e;
-  mouse.pos = [x,y];
-}
-
-function resize() {
-  screen.update();
-  /*
-  screen.width = canvas.width = window.innerWidth;
-  screen.height = canvas.height = window.innerHeight;
-  screen.center = [window.innerWidth/2,window.innerHeight/2];
-  */
-}
-
-function onkeydown(e){
-  //console.log(e);
-  if(e.key=='ArrowUp')
-    controls.up=true;
-  if(e.key=='+')
-    if(!controls.zoomout)
-      controls.zoomin=true;
-  if(e.key=='-')
-    if(!controls.zoomin)
-      controls.zoomout=true;
-}
-
-function onkeyup(e){
-  //console.log(e);
-  if(e.key=='ArrowUp')
-    controls.up=false;
-  if(e.key=='+')
-    controls.zoomin=false;
-  if(e.key=='-')
-    controls.zoomout=false;
-}
-
-function onclick(e){
-  ship.fire();
-}
-
-window.addEventListener('resize', resize);
-window.addEventListener('touchstart', touch);
-window.addEventListener('touchmove', touch);
-window.addEventListener('mousemove', mousemove);
-document.addEventListener('keydown', onkeydown);
-document.addEventListener('keyup', onkeyup);
 
 
 </script>

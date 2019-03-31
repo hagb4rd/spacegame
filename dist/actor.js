@@ -20,25 +20,34 @@ var Actor = function Actor() {
 }
 Actor.prototype = new $.EventTarget();
 Actor.prototype.constructor = Actor.constructor;
+Actor.prototype.parent = null;
+Actor.prototype.disposed = false;
 Actor.prototype.pos = Vector.create([0,0]);
 Actor.prototype.angle = 0;
 Actor.prototype.color = "green";
 Actor.prototype.detectCollisions = false;
 Actor.prototype.vertex = [];
 Actor.prototype.lines = [];
-Actor.prototype.update = function() {
+Actor.prototype.velocity = [0,0];
+Actor.prototype.dispose = function() {
+  this.disposed = true;
+}
+Actor.prototype.update = function(t) {
+  var deltaPos = Vector.scale(t,this.velocity);
+  this.pos = Vector.add(this.pos, deltaPos);
+
   this.compute();
 };
 Actor.prototype.compute = function() {
   var rotation=Matrix.rotate2D(this.angle);
   var translation=Matrix.translate2D(this.pos);
   var transposition=Matrix.product(rotation,translation);
-  var projection=Matrix.product(transposition,screen.projectionMatrix);
+  var projection=Matrix.product(transposition,this.parent.screen.projectionMatrix);
   var vertices = this.vertex.map(vertex=>projection.multiplicate(vertex));
   this.projection=vertices;
   return vertices;
 };
-Actor.prototype.draw = function() {
+Actor.prototype.draw = function(ctx) {
 
   this.lines.forEach(line => {
     ctx.beginPath();
@@ -88,26 +97,56 @@ var Ship = class extends Actor {
     this.maxvelocity = 400;
 
   }
-  update() {
-    this.angle=mouse.angle;
+  fire() {
+    var misslePos = [30,0];
+    var rotation = Matrix.rotate2D(this.angle);
+    misslePos = Vector.add(this.pos, rotation.multiplicate(misslePos));
+    game.add(new Missle(misslePos, this.angle));
+  }
+  update(t) {
+    this.angle=this.parent.mouse.angle;
     //friction
     var deltaV = Vector.scale(-1*t/this.friction,this.velocity);
-    this.velocity.add(deltaV)
+    this.velocity = Vector.add(this.velocity, deltaV)
     //accelerate
-    if(controls.up) {
+    if(this.parent.controls.up) {
       var a = [Math.cos(this.angle)*this.acceleration,Math.sin(this.angle)*this.acceleration];
       var deltaV=Vector.scale(t,a);
-      this.velocity.add(deltaV);
-      if(this.velocity.size > this.maxvelocity)
-        this.velocity.subtract(deltaV);
+      this.velocity = Vector.add(this.velocity,deltaV);
     }
-    var deltaPos=Vector.scale(t,this.velocity);
-    this.pos.add(deltaPos);
+    super.update(t);
+    this.parent.actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
+      if(Actor.isCollision(this, actor)) {
+        actor.detectCollisions=false;
+        actor.color="red";
+      }
+    })
+  }
+}
+var Missle = class extends Actor {
+  constructor(pos,angle) {
+    super();
+    this.pos=pos;
+    this.angle=angle;
+    this.color="yellow";
+    this.lifetime=2;
+    var velocity = 200;
+    this.vertex = [[-2,0],[2,0]];
+    this.lines = [[0,1]];
+    this.velocity = [Math.cos(this.angle)*velocity, Math.sin(this.angle)*velocity];
 
-    this.compute();
-    actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
+  }
+  update(t){
+    this.lifetime -= t;
+    if (this.lifetime < 0) {
+      this.dispose();
+    }
+    
+    super.update(t);
+    this.parent.actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
       if(Actor.isCollision(this, actor)) {
         actor.color="red";
+        actor.detectCollisions=false;
       }
     })
   }
