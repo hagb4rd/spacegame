@@ -1,4 +1,5 @@
 
+//freeman.celine
 var Actor = function Actor() {
   EventEmitter.call(this);
   Object.defineProperty(this, 'private', {
@@ -26,6 +27,9 @@ Actor.prototype.pos = [0,0];
 Actor.prototype.angle = 0;
 Actor.prototype.color = "green";
 Actor.prototype.detectCollisions = false;
+Actor.prototype.onCollision = function(actor) {
+  
+}
 Actor.prototype.vertex = [];
 Actor.prototype.lines = [];
 Actor.prototype.velocity = [0,0];
@@ -37,6 +41,14 @@ Actor.prototype.update = function(t) {
   this.pos = v.add(this.pos, deltaPos);
 
   this.compute();
+  if(this.detectCollisions) {
+      this.parent.actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
+        if(this.isCollision(actor)) {
+          this.onCollision(actor);
+          
+        }
+      })
+    }
 };
 Actor.prototype.compute = function() {
   var rotation=matrix2d.rotate(this.angle);
@@ -63,16 +75,16 @@ Actor.prototype.draw = function(ctx) {
     ctx.stroke();
   })
 }
-Actor.isCollision = function(a,b) {
-  var distance = v.size(v.subtract(a.pos,b.pos));
-  if(distance <= a.radius + b.radius) {
-    if(!a.projection) {
-      a.compute();
+Actor.prototype.isCollision = function(b) {
+  var distance = v.size(v.subtract(this.pos,b.pos));
+  if(distance <= this.radius + b.radius) {
+    if(!this.projection) {
+      this.compute();
     }
     if(!b.projection) {
       b.compute();
     }
-    return a.projection.some(vertex=>isPointInPoly(b.lines[0].map(i=>b.projection[i]),vertex));
+    return this.projection.some(vertex=>isPointInPoly(b.lines[0].map(i=>b.projection[i]),vertex));
   } 
   return false;
 }
@@ -91,10 +103,10 @@ var Ship = class extends Actor {
         [0,1,2,3,0]
     ];
     //ship.radius = v.create(ship.vertex[0]).size;
-    this.acceleration=60;
-    this.friction=6;
+    this.acceleration=100;
+    this.friction=10;
     this.velocity = [0,0];
-    this.maxvelocity = 400;
+    this.maxvelocity = 600;
 
   }
   fire() {
@@ -115,12 +127,7 @@ var Ship = class extends Actor {
       this.velocity = v.add(this.velocity,deltaV);
     }
     super.update(t);
-    this.parent.actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
-      if(Actor.isCollision(this, actor)) {
-        actor.detectCollisions=false;
-        actor.color="red";
-      }
-    })
+    
   }
 }
 var Missle = class extends Actor {
@@ -130,11 +137,16 @@ var Missle = class extends Actor {
     this.angle=angle;
     this.color="yellow";
     this.lifetime=2;
+    this.detectCollisions=true;
     var velocity = 200;
     this.vertex = [[-2,0],[2,0]];
     this.lines = [[0,1]];
     this.velocity = [Math.cos(this.angle)*velocity, Math.sin(this.angle)*velocity];
 
+  }
+  onCollision(actor){
+    actor.onCollision(this);
+    this.dispose();
   }
   update(t){
     this.lifetime -= t;
@@ -143,11 +155,15 @@ var Missle = class extends Actor {
     }
     
     super.update(t);
+    /*
     this.parent.actors.filter(actor=>actor.detectCollisions).forEach(actor=>{
-      if(Actor.isCollision(this, actor)) {
-        actor.color="red";
-        actor.detectCollisions=false;
+      if(this.isCollision(actor)) {
+        //on collision explode and hit target.
+        actor.onCollision(this);
+        //actor.detectCollisions=false;
+        this.dispose();
       }
     })
+    */
   }
 }
