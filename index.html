@@ -1,36 +1,321 @@
+<!DOCTYPE html>
 <html>
 <head>
-<title>spacegame</title>
-<script src="eventemitter.js"></script>
-<script src="vector.js"></script>
-<script src="actor.js"></script>
-<script src="game.js" defer></script>
-<style>
-* {
-    margin: 0;
-    padding: 0;
-}
-html {
-    background-color: #023;
-    color: #eee;
-}
-canvas {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    margin: auto;
-    width: 100%;
-    height: 100%;
-}
-</style>    
+    <title>Matrix Space - Parent-Node Edition</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        html, body { background-color: #011627; width: 100%; height: 100%; overflow: hidden; }
+        canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+    </style>    
 </head>
 <body>
 <canvas></canvas> 
 <script>
+/** * MATH UTILS 
+ */
+const v = {
+    add: (v1, ...vs) => vs.reduce((p, c) => p.map((val, i) => val + c[i]), v1),
+    subtract: (v1, v2) => v1.map((val, i) => val - v2[i]),
+    scale: (k, v1) => v1.map(val => val * k),
+    dot: (v1, v2) => v1.reduce((sum, val, i) => sum + val * (v2[i] || 0), 0),
+    size: (v1) => Math.sqrt(v1.reduce((sum, val) => sum + val * val, 0)),
+    angle: (v1) => Math.atan2(v1[1], v1[0])
+};
 
+const matrix2d = {
+    rotate: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0,0,1]],
+    translate: ([x, y]) => [[1,0,x], [0,1,y], [0,0,1]],
+    scale: ([x, y]) => [[x,0,0], [0,y,0], [0,0,1]],
+    multiply: (A, B) => {
+        const B_T = [[B[0][0], B[1][0], B[2][0]], [B[0][1], B[1][1], B[2][1]], [B[0][2], B[1][2], B[2][2]]];
+        return A.map(row => B_T.map(col => v.dot(row, col)));
+    },
+    apply: (M, vec) => [v.dot(M[0], [vec[0], vec[1], 1]), v.dot(M[1], [vec[0], vec[1], 1])]
+};
 
+const isPointInPoly = (poly, pt) => {
+    let c = false;
+    for (let i = -1, l = poly.length, j = l - 1; ++i < l; j = i)
+        ((poly[i][1] <= pt[1] && pt[1] < poly[j][1]) || (poly[j][1] <= pt[1] && pt[1] < poly[i][1]))
+        && (pt[0] < (poly[j][0] - poly[i][0]) * (pt[1] - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0])
+        && (c = !c);
+    return c;
+};
+
+/**
+ * BASE CLASSES
+ */
+class Actor {
+    constructor() {
+        this.parent = null; // Set via parent.add()
+        this.pos = [0, 0];
+        this.angle = 0;
+        this.velocity = [0, 0];
+        this.vertex = [];
+        this.lines = [];
+        this.color = "white";
+        this.disposed = false;
+        this.detectCollisions = false;
+        this.radius = 0;
+    }
+
+    compute(projMatrix) {
+        const M = matrix2d.multiply(matrix2d.translate(this.pos), matrix2d.rotate(this.angle));
+        this.projection = this.vertex.map(vert => matrix2d.apply(matrix2d.multiply(projMatrix, M), vert));
+        if (this.radius === 0 && this.vertex.length > 0) this.radius = Math.max(...this.vertex.map(v.size));
+    }
+
+    draw(ctx) {
+        if (!this.projection) return;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        this.lines.forEach(line => {
+            ctx.beginPath();
+            ctx.moveTo(...this.projection[line[0]]);
+            line.slice(1).forEach(idx => ctx.lineTo(...this.projection[idx]));
+            ctx.stroke();
+        });
+    }
+
+    isCollision(b) {
+        if (v.size(v.subtract(this.pos, b.pos)) > (this.radius + b.radius)) return false;
+        const bPoly = b.lines[0].map(idx => b.projection[idx]);
+        return this.projection.some(pt => isPointInPoly(bPoly, pt));
+    }
+}
+
+class Particle extends Actor {
+    constructor(pos, vel, life, color) {
+        super();
+        this.pos = pos;
+        this.velocity = vel;
+        this.life = this.maxLife = life;
+        this.vertex = [[-1, -1], [1, 1]];
+        this.lines = [[0, 1]];
+        this.color = color || "#00f2ff";
+    }
+    update(t) {
+        this.life -= t;
+        this.pos = v.add(this.pos, v.scale(t, this.velocity));
+        if (this.life <= 0) this.disposed = true;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        super.draw(ctx);
+        ctx.restore();
+    }
+}
+
+class Missle extends Actor {
+    constructor(pos, angle, shipVel) {
+        super();
+        this.pos = pos;
+        this.angle = angle;
+        this.detectCollisions = true;
+        this.color = "#ffeb3b";
+        this.life = 1.5;
+        this.vertex = [[0, 0], [15, 0]];
+        this.lines = [[0, 1]];
+        this.velocity = v.add(shipVel, [Math.cos(angle) * 1000, Math.sin(angle) * 1000]);
+    }
+    update(t) {
+        this.life -= t;
+        this.pos = v.add(this.pos, v.scale(t, this.velocity));
+        if (this.life <= 0) this.disposed = true;
+    }
+    onCollision(target) {
+        if (target instanceof Rock) {
+            target.hit(this.velocity);
+            this.disposed = true;
+        }
+    }
+}
+
+class Rock extends Actor {
+    constructor(pos, tier, velocity) {
+        super();
+        this.pos = pos;
+        this.tier = tier || 3;
+        this.detectCollisions = true;
+        this.color = "#789";
+        this.velocity = velocity || [Math.random() * 80 - 40, Math.random() * 80 - 40];
+        this.angVel = (Math.random() - 0.5) * (5 - this.tier);
+        
+        const baseRadius = this.tier * 22;
+        const sides = 7 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < sides; i++) {
+            const a = (i / sides) * Math.PI * 2 + Math.random() * 0.3;
+            const r = baseRadius * (0.8 + Math.random() * 0.4);
+            this.vertex.push([Math.cos(a) * r, Math.sin(a) * r]);
+        }
+        this.lines = [[...Array(sides).keys(), 0]];
+    }
+    update(t) {
+        this.pos = v.add(this.pos, v.scale(t, this.velocity));
+        this.angle += this.angVel * t;
+    }
+    hit(impactVel) {
+        if (!this.parent) return; // Guard against orphan hits
+        const debrisDir = v.scale(0.3, impactVel || [0, 0]);
+        for (let i = 0; i < this.tier * 4; i++) {
+            const pVel = v.add(debrisDir, [Math.random() * 300 - 150, Math.random() * 300 - 150]);
+            this.parent.add(new Particle(this.pos, pVel, 0.6, "#789"));
+        }
+        if (this.tier > 1) {
+            for (let i = 0; i < 2; i++) {
+                const newVel = v.add(this.velocity, [Math.random() * 160 - 80, Math.random() * 160 - 80]);
+                this.parent.add(new Rock(this.pos, this.tier - 1, newVel));
+            }
+        }
+        this.disposed = true;
+    }
+}
+
+class Ship extends Actor {
+    constructor() {
+        super();
+        this.vertex = [[30, 0], [-15, 18], [-5, 0], [-15, -18]];
+        this.lines = [[0, 1, 2, 3, 0]];
+        this.color = "#00ffcc";
+        this.detectCollisions = true;
+    }
+    onCollision(target) {
+        if (target instanceof Rock && !this.disposed) {
+            for (let i = 0; i < 40; i++) {
+                const pVel = [Math.random() * 800 - 400, Math.random() * 800 - 400];
+                this.parent.add(new Particle(this.pos, pVel, 1.5, "#ffc107"));
+            }
+            this.disposed = true;
+            this.parent.reset();
+        }
+    }
+}
+
+/**
+ * GAME ENGINE
+ */
+const Game = function() {
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const game = { 
+        actors: [], 
+        controls: { up: false }, 
+        mouse: { pos: [0, 0] }, 
+        screen: { zoom: 1, shake: 0, fps: 0 }, 
+        lastTime: 0, 
+        state: "play" 
+    };
+
+    let player;
+    let deathPos = [0, 0];
+
+    // THE NODE REGISTRATION METHOD
+    game.add = (actor) => {
+        actor.parent = game;
+        game.actors.push(actor);
+        return actor;
+    };
+
+    game.init = () => {
+        game.actors = [];
+        player = new Ship();
+        game.add(player);
+        game.state = "play";
+        game.screen.zoom = 1;
+        for (let i = 0; i < 12; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const d = 600 + Math.random() * 1000;
+            game.add(new Rock([Math.cos(a) * d, Math.sin(a) * d], 3));
+        }
+    };
+
+    game.reset = () => {
+        game.state = "gameover";
+        deathPos = [...player.pos];
+        setTimeout(() => game.init(), 3000);
+    };
+
+    game.init();
+
+    const loop = (time) => {
+        let dt = (time - game.lastTime) / 1000;
+        if (dt > 0.1) dt = 0.1;
+        game.lastTime = time;
+        game.screen.fps = Math.round(1 / dt);
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const center = [canvas.width / 2, canvas.height / 2];
+
+        if (game.state === "play" && !player.disposed) {
+            const rel = v.subtract(game.mouse.pos, center);
+            if (v.size(rel) > 0) player.angle = v.angle(rel);
+            if (game.controls.up) {
+                game.screen.shake = 4;
+                const acc = v.scale(800 * dt, [Math.cos(player.angle), Math.sin(player.angle)]);
+                player.velocity = v.add(player.velocity, acc);
+                const rotM = matrix2d.rotate(player.angle);
+                const port = v.add(player.pos, matrix2d.apply(rotM, [-12, 0]));
+                game.add(new Particle(port, v.add(player.velocity, v.scale(-200, [Math.cos(player.angle + (Math.random() - 0.5)), Math.sin(player.angle)])), 0.4));
+            }
+            player.velocity = v.scale(0.99, player.velocity);
+            player.pos = v.add(player.pos, v.scale(dt, player.velocity));
+        }
+
+        const s = game.screen.shake; game.screen.shake *= 0.9;
+        const targetPos = (game.state === "play") ? player.pos : deathPos;
+        if (game.state === "gameover") game.screen.zoom *= 0.998;
+
+        const viewMatrix = matrix2d.multiply(
+            matrix2d.translate(v.add(center, [(Math.random() - 0.5) * s, (Math.random() - 0.5) * s])),
+            matrix2d.multiply(matrix2d.scale([game.screen.zoom, game.screen.zoom]), matrix2d.translate(v.scale(-1, targetPos)))
+        );
+
+        game.actors = game.actors.filter(a => !a.disposed);
+        game.actors.forEach(a => { if (a.update) a.update(dt); a.compute(viewMatrix); });
+
+        const colliders = game.actors.filter(a => a.detectCollisions);
+        colliders.forEach(a => {
+            game.actors.forEach(b => {
+                if (a !== b && b.detectCollisions && a.isCollision(b)) if (a.onCollision) a.onCollision(b);
+            });
+        });
+
+        ctx.fillStyle = "#011627"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        game.actors.forEach(a => a.draw(ctx));
+
+        ctx.fillStyle = "#00ffcc"; ctx.font = "12px monospace";
+        ctx.fillText(`FPS: ${game.screen.fps} | OBJECTS: ${game.actors.length}`, 20, 30);
+        if (game.state === "gameover") {
+            ctx.fillStyle = "#ff5722"; ctx.font = "bold 40px monospace";
+            ctx.textAlign = "center"; ctx.fillText("CRITICAL FAILURE", center[0], center[1]);
+        }
+
+        requestAnimationFrame(loop);
+    };
+
+    window.addEventListener('mousemove', e => game.mouse.pos = [e.clientX, e.clientY]);
+    window.addEventListener('keydown', e => {
+        if ((e.key === 'ArrowUp' || e.key === 'w')) game.controls.up = true;
+        if (e.key === ' ' && !player.disposed) {
+            const muz = v.add(player.pos, matrix2d.apply(matrix2d.rotate(player.angle), [30, 0]));
+            game.add(new Missle(muz, player.angle, player.velocity));
+        }
+    });
+    window.addEventListener('keyup', e => { if (e.key === 'ArrowUp' || e.key === 'w') game.controls.up = false; });
+    window.addEventListener('mousedown', () => {
+        if (!player.disposed && game.state === "play") {
+            const muz = v.add(player.pos, matrix2d.apply(matrix2d.rotate(player.angle), [30, 0]));
+            game.add(new Missle(muz, player.angle, player.velocity));
+        }
+    });
+
+    requestAnimationFrame(loop);
+    return game;
+};
+
+const game = Game();
 </script>
 </body>
 </html>
