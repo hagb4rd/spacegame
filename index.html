@@ -41,13 +41,13 @@ var isPointInPoly = (poly, pt) => {
 
 
 var forEach = (arr, fn) => {
-	for(let i=0;i<arr.length;i++) {
+	for(var i=0;i<arr.length;i++) {
 		fn(arr[i],i);
 	};
 }
 var map = (arr, fn) => {
 	var xs = Array(arr.length);
-	for(let i=0;i<arr.length;i++) {
+	for(var i=0;i<arr.length;i++) {
 		xs[i]=fn(arr[i],i);
 	};
 	return xs;
@@ -61,7 +61,7 @@ var reduce = (arr, fn, init) => {
 		start=0;
 		prev=init;
 	}
-	for(let i=start;i<arr.length;i++) {
+	for(var i=start;i<arr.length;i++) {
 		next = arr[i];
 		prev = fn(prev,next);
 	};
@@ -87,7 +87,7 @@ v.cross =(v1, v2) =>[
 v.wolfram = (list) =>"http://www.wolframalpha.com/input/?i=" + encodeURI(list.map(v=>"vector+"+v.toString()).join('+')); 
 
 
-/*
+//*
 var matrix3d = () => [
 	[1,0,0,0],
 	[0,1,0,0],
@@ -101,15 +101,15 @@ var matrix2d = () => [
 ]
 matrix2d.star = (A) => {
 	var B=matrix2d();
-	for(let i=0;i<A.length;i++) 
-		for(let j=0;j<A[i].length;j++)
+	for(var i=0;i<A.length;i++) 
+		for(var j=0;j<A[i].length;j++)
 			B[j][i]=A[i][j];
 	return B;
 }
 matrix3d.star = (A) => {
 	var B=matrix3d();
-	for(let i=0;i<A.length;i++) 
-		for(let j=0;j<A[i].length;j++)
+	for(var i=0;i<A.length;i++) 
+		for(var j=0;j<A[i].length;j++)
 			B[j][i]=A[i][j];
 	return B;
 }
@@ -171,25 +171,36 @@ matrix2d.scale = ([x,y]) => [
 	[0,0,1]
 ];
     
-matrix2d.product = (A,B) => {
+matrix2d.product= (A,B) => {
 	var Astar=matrix2d.star(A);
 	var C=matrix2d();
-	for(let i=0;i<B.length;i++)
-	  for(let j=0;j<B[i].length;j++)
+	for(var i=0;i<B.length;i++)
+	  for(var j=0;j<B[i].length;j++)
 		C[i][j]=v.dot(B[i],Astar[j]);
     return C;
 }
-matrix3d.product = (A,B) => {
+matrix3d.product= (A,B) => {
 	var Astar=matrix3d.star(A);
 	var C=matrix3d();
-	for(let i=0;i<B.length;i++)
-	  for(let j=0;j<B[i].length;j++)
+	for(var i=0;i<B.length;i++)
+	  for(var j=0;j<B[i].length;j++)
 		C[i][j]=v.dot(B[i],Astar[j]);
     return C;
 }
-matrix2d.multiplicate=matrix2d.multiply= (M,v1) => M.map(row=>v.dot(row,v1)).slice(0,2);
-matrix3d.multiplicate = (M,v1) => M.map(row=>v.dot(row,v1)).slice(0,3);
-*/
+matrix2d.multiplicate=(M,v1) => M.map(row=>v.dot(row,v1)).slice(0,2);
+matrix3d.multiplicate=(M,v1) => M.map(row=>v.dot(row,v1)).slice(0,3);
+
+matrix2d.apply = (M, vec) => [v.dot(M[0], [vec[0], vec[1], 1]), v.dot(M[1], [vec[0], vec[1], 1])]
+matrix2d.multiply = (A, B) => {
+        //const B_T = [[B[0][0], B[1][0], B[2][0]], [B[0][1], B[1][1], B[2][1]], [B[0][2], B[1][2], B[2][2]]];
+				const B_T = matrix2d.star(B);
+        return A.map(row => B_T.map(col => v.dot(row, col)));
+    }
+/* */
+
+
+
+/*
 const matrix2d = {
     rotate: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0,0,1]],
     translate: ([x, y]) => [[1,0,x], [0,1,y], [0,0,1]],
@@ -200,7 +211,7 @@ const matrix2d = {
     },
     apply: (M, vec) => [v.dot(M[0], [vec[0], vec[1], 1]), v.dot(M[1], [vec[0], vec[1], 1])]
 };
-
+/* */
 /** * PHYSICS HELPERS */
 const resolveBounce = (a, b) => {
     const normal = v.normalize(v.subtract(a.pos, b.pos));
@@ -224,6 +235,9 @@ class Actor extends EventEmitter {
         const M = matrix2d.multiply(matrix2d.translate(this.pos), matrix2d.rotate(this.angle));
         this.projection = this.vertex.map(vert => matrix2d.apply(matrix2d.multiply(projMatrix, M), vert));
         if (this.radius === 0 && this.vertex.length > 0) this.radius = Math.max(...this.vertex.map(v.size));
+    }
+    update() {
+    	
     }
     draw(ctx) {
         if (!this.projection) return;
@@ -289,7 +303,7 @@ class Rock extends Actor {
         this.angVel = (Math.random() - 0.5) * (5 - this.tier);
         const baseRadius = this.tier * 22;
         const sides = 7 + Math.floor(Math.random() * 5);
-        for (let i = 0; i < sides; i++) {
+        for (var i = 0; i < sides; i++) {
             const a = (i / sides) * Math.PI * 2 + Math.random() * 0.3;
             const r = baseRadius * (0.8 + Math.random() * 0.4);
             this.vertex.push([Math.cos(a) * r, Math.sin(a) * r]);
@@ -309,12 +323,12 @@ class Rock extends Actor {
     split(impactVel) {
         if (this.disposed) return;
         const debrisDir = v.scale(0.3, impactVel || [0, 0]);
-        for (let i = 0; i < this.tier * 4; i++) {
+        for (var i = 0; i < this.tier * 4; i++) {
             const pVel = v.add(debrisDir, [Math.random() * 300 - 150, Math.random() * 300 - 150]);
             this.emit('spawn', new Particle(this.pos, pVel, 0.6, "#789"));
         }
         if (this.tier > 1) {
-            for (let i = 0; i < 2; i++) {
+            for (var i = 0; i < 2; i++) {
                 // Safe Spawning: offset children so they don't immediately collide
                 const offset = v.scale(this.radius * 0.6, [(i?1:-1), (i?1:-1)]);
                 const newVel = v.add(this.velocity, [Math.random() * 160 - 80, Math.random() * 160 - 80]);
@@ -334,7 +348,7 @@ class Ship extends Actor {
         this.detectCollisions = true;
         this.on('collision', (other) => {
             if (other instanceof Rock && !this.disposed) {
-                for (let i = 0; i < 40; i++) {
+                for (var i = 0; i < 40; i++) {
                     const pVel = [Math.random() * 800 - 400, Math.random() * 800 - 400];
                     this.emit('spawn', new Particle(this.pos, pVel, 1.5, "#ffc107"));
                 }
@@ -350,13 +364,193 @@ class Ship extends Actor {
     }
 }
 
+
+var Game2 = function() {
+	var game = {
+        progress: 0,
+        start: 0,
+        t: 0,
+        fps: 0,
+        actors: []
+    }
+    
+    game.add = (actor) => {
+    		actor.parent=game;
+        actor.on('spawn', (newActor) => game.add(newActor));
+        actor.on('death', () => game.reset());
+        game.actors.push(actor);
+        return actor;
+    };
+
+    var canvas = document.querySelector('canvas');
+    var ctx = canvas.getContext('2d');
+    game.controls = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        zoomin: false,
+        zoomout: false
+    }
+    game.mouse = {
+        pos: [0, 0],
+        relative: [0, 0],
+        angle: 0,
+        update() {
+            var [x,y] = this.pos;
+            this.relative = v.subtract(game.screen.center, this.pos);
+            this.relative = [-this.relative[0], this.relative[1]]
+            //this.angle=(this.relative.angle+Math.PI/2)%(Math.PI*2);
+            this.angle = v.angle([this.relative[0], this.relative[1]]);
+            //this.angle = 2*Math.PI-angle;
+        },
+        draw() {
+        }
+    }
+    game.screen = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        center: [window.innerWidth / 2, window.innerHeight / 2],
+        pos: [0, 0],
+        zoom: 1,
+        maxzoom: 4,
+        minzoom: 0.25,
+        projectionMatrix: null,
+        update(t) {
+            this.pos = typeof (ship) == 'undefined' ? v.create([0, 0]) : ship.pos;
+            this.width = canvas.width = window.innerWidth,
+            this.height = canvas.height = window.innerHeight,
+            this.center = [window.innerWidth / 2, window.innerHeight / 2]
+
+            if (game.controls.zoomin)
+                this.zoom += t;
+            if (game.controls.zoomout)
+                this.zoom -= t;
+            if (this.zoom > this.maxzoom)
+                this.zoom = this.maxzoom;
+            if (this.zoom < this.minzoom)
+                this.zoom = this.minzoom;
+
+            var scale = matrix2d.scale([this.zoom, -this.zoom])
+            var translate = matrix2d.translate(v.add(this.center, v.scale(this.zoom, [-this.pos[0], this.pos[1]])));
+            this.projectionMatrix = matrix2d.product(scale, translate);
+        },
+        draw() {
+            ctx.font = '14pt Arial';
+            ctx.strokeStyle = 'red';
+            ctx.strokeText(`fps: ${game.fps} pos: [${ship.pos[0].toFixed(1)},${ship.pos[1].toFixed(1)}] v: [${ship.velocity[0].toFixed(1)},${ship.velocity[1].toFixed(1)}] angle: ${deg(game.mouse.angle).toFixed(1)}`, 14, 14);
+        }
+    }
+
+
+                
+    //Ship: Actor .. game.add(actorL: Actor) // add them to game loop. and .dispose() to garbage wehn needed
+    var ship = new Ship();
+    game.add(ship);
+
+		//add rocks
+    game.add(new Rock());
+
+    game.loop = (function(time) {
+        //update time
+        if (!game.start)
+            game.start = time;
+        var swap = (time - game.start) / 1000;
+        game.t = game.progress ? swap - game.progress : 0;
+        game.progress = swap;
+        game.framecount++;
+        game.timeUntilSecond = game.timeUntilSecond || 0;
+        game.timeUntilSecond += game.t;
+        if (game.timeUntilSecond > 1) {
+            game.fps = game.framecount;
+            game.framecount = 0
+            game.timeUntilSecond = 0;
+        }
+
+        //screen 
+        game.screen.update(game.t);
+        game.mouse.update(game.t);
+
+        game.actors = game.actors.filter(actor=>!actor.disposed);
+
+        //update all actors
+        game.actors.forEach(actor=>actor.update(game.t));
+        //update ship
+        //ship.update(game.t);
+
+        //.. & draw
+        game.screen.draw(ctx);
+        game.actors.forEach(actor=>actor.draw(ctx));
+        //ship.draw(ctx);
+
+        requestAnimationFrame(game.loop);
+    }
+    ).bind(game);
+
+    game.loop();
+
+
+
+    //document binding
+    function touch(e) {
+        var {pageX: x, pageY: y} = e.originalEvent.touches[0];
+        game.mouse.pos = [x, y];
+    }
+
+    function mousemove(e) {
+        var {pageX: x, pageY: y} = e;
+        game.mouse.pos = [x, y];
+    }
+
+    function resize() {
+        game.screen.update();
+    }
+
+    function onkeydown(e) {
+        //console.log(e);
+        if (e.key == 'ArrowUp')
+            game.controls.up = true;
+        if (e.key == 'z')
+            if (!game.controls.zoomout)
+                game.controls.zoomin = true;
+        if (e.key == 'x')
+            if (!game.controls.zoomin)
+                game.controls.zoomout = true;
+    }
+
+    function onkeyup(e) {
+        //console.log(e);
+        if (e.key == 'ArrowUp')
+            game.controls.up = false;
+        if (e.key == 'z')
+            game.controls.zoomin = false;
+        if (e.key == 'x')
+            game.controls.zoomout = false;
+    }
+
+    function onclick(e) {
+        ship.fire();
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('touchstart', touch);
+    window.addEventListener('touchmove', touch);
+    window.addEventListener('mousemove', mousemove);
+    document.addEventListener('keydown', onkeydown);
+    document.addEventListener('keyup', onkeyup);
+    document.addEventListener('click', onclick);
+
+    return game;
+}
+
+
 /** * GAME ORCHESTRATOR */
 const Game = function() {
     const canvas = document.querySelector('canvas');
     const ctx = canvas.getContext('2d');
     const game = { actors: [], stars: [], controls: { up: false }, mouse: { pos: [0, 0] }, screen: { zoom: 1, shake: 0 }, lastTime: 0, state: "play" };
 
-    for(let i=0; i<150; i++) {
+    for(var i=0; i<150; i++) {
         game.stars.push({ pos: [Math.random()*4000-2000, Math.random()*4000-2000], size: Math.random()*2, depth: 0.1 + Math.random()*0.8 });
     }
 
@@ -372,7 +566,7 @@ const Game = function() {
         player = game.add(new Ship());
         game.state = "play";
         game.screen.zoom = 1;
-        for (let i = 0; i < 15; i++) {
+        for (var i = 0; i < 15; i++) {
             const a = Math.random() * Math.PI * 2;
             const d = 800 + Math.random() * 1200;
             game.add(new Rock([Math.cos(a) * d, Math.sin(a) * d], 3));
@@ -388,7 +582,7 @@ const Game = function() {
     game.init();
 
     const loop = (time) => {
-        let dt = (time - game.lastTime) / 1000;
+        var dt = (time - game.lastTime) / 1000;
         if (dt > 0.1) dt = 0.1;
         game.lastTime = time;
 
@@ -430,10 +624,10 @@ const Game = function() {
         game.actors.forEach(a => { if (a.update) a.update(dt); a.compute(viewMatrix); a.draw(ctx); });
 
         const colliders = game.actors.filter(a => a.detectCollisions);
-        for(let i=0; i<colliders.length; i++) {
-            for(let j=0; j<colliders.length; j++) {
+        for(var i=0; i<colliders.length; i++) {
+            for(var j=0; j<colliders.length; j++) {
                 if(i!=j) {
-                    let a = colliders[i]; let b = colliders[j];    
+                    var a = colliders[i]; var b = colliders[j];    
                     if (a.isCollision(b)) {
                         a.emit('collision', b); 
                         b.emit('collision', a); 
