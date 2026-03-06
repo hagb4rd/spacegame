@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Matrix Space - RC4 (Physics & Parallax) + Chiptune Sounds</title>
+    <title>Matrix Space - RC6 + Chiptune Sounds</title>
     <style>
         * { margin: 0; padding: 0; }
         html, body { background-color: #011220; width: 100%; height: 100%; overflow: hidden; }
@@ -13,9 +13,12 @@
 
 <script>
 // ────────────────────────────────────────────────────────────────────────────────
-// CHIptune SOUNDS – Web Audio API
+// CHIptune SOUNDS – Web Audio API (Hybrid: Dynamic modulation + cached noise)
 // ────────────────────────────────────────────────────────────────────────────────
 let audioCtx = null;
+let sharedNoiseBuffer = null;  // ADDED: Cached white noise buffer (generated once for efficiency)
+let thrustSource = null;       // ADDED: For looping thrust sound
+let thrustNoiseSource = null;  // ADDED: Noise layer for thrust
 
 function initAudio() {
     if (!audioCtx) {
@@ -25,13 +28,25 @@ function initAudio() {
     }
 }
 
+// ADDED: Generate shared noise buffer once (1s of white noise, reusable for explosions/thrust)
+function generateSharedNoise() {
+    if (sharedNoiseBuffer) return;
+    const duration = 1.0;  // Long enough to slice/loop without repetition artifacts
+    const bufferSize = audioCtx.sampleRate * duration;
+    sharedNoiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = sharedNoiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;  // Pure white noise
+    }
+}
+
 function playLaser() {
     initAudio();
     const now = audioCtx.currentTime;
 
     const osc = audioCtx.createOscillator();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.setValueAtTime(880 + (Math.random() * 100 - 50), now);  // ADDED: Slight random detune for variety
     osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
 
     const filter = audioCtx.createBiquadFilter();
@@ -51,24 +66,20 @@ function playLaser() {
 
 function playExplosion(intensity = 1) {
     initAudio();
+    generateSharedNoise();  // Ensure cached noise exists
     const now = audioCtx.currentTime;
-    const duration = 0.3;
+    const duration = 0.3 * intensity;  // ADDED: Dynamic duration based on intensity
 
-    // Boom square wave
+    // Boom square wave (dynamic osc)
     const osc = audioCtx.createOscillator();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(250 * intensity, now);
+    osc.frequency.setValueAtTime(250 * intensity + (Math.random() * 50 - 25), now);  // ADDED: Random low-end variation
     osc.frequency.exponentialRampToValueAtTime(30, now + duration);
 
-    // Noise for debris
-    const bufferSize = audioCtx.sampleRate * duration;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
-    }
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
+    // Noise from shared buffer (slice a random section for variety)
+    const noiseStart = Math.random() * (sharedNoiseBuffer.duration - duration);  // Random offset
+    const noiseSource = audioCtx.createBufferSource();
+    noiseSource.buffer = sharedNoiseBuffer;
 
     const gainOsc   = audioCtx.createGain();
     gainOsc.gain.setValueAtTime(0.10 * intensity, now);
@@ -84,13 +95,76 @@ function playExplosion(intensity = 1) {
     filter.frequency.exponentialRampToValueAtTime(60, now + duration);
 
     osc.connect(gainOsc).connect(filter);
-    noise.connect(gainNoise).connect(filter);
+    noiseSource.connect(gainNoise).connect(filter);
     filter.connect(audioCtx.destination);
 
     osc.start(now);
-    noise.start(now);
+    noiseSource.start(now, noiseStart, duration);  // Slice from shared buffer
     osc.stop(now + duration);
-    noise.stop(now + duration);
+    noiseSource.stop(now + duration);
+}
+
+// ADDED: New sound - Thrust rumble (looping sawtooth + noise, dynamic pitch by speed)
+function startThrust(shipVelocity) {
+    initAudio();
+    generateSharedNoise();  // Ensure noise exists
+    if (thrustSource) return;  // Already playing
+
+    thrustSource = audioCtx.createOscillator();
+    thrustSource.type = 'sawtooth';
+    const baseFreq = 80;
+    const speedFactor = v.size(shipVelocity) / 1000;  // Dynamic: Pitch up with ship speed (normalize to reasonable range)
+    thrustSource.frequency.value = baseFreq + speedFactor * 40;  // Up to +40Hz at high speed
+
+    const thrustFilter = audioCtx.createBiquadFilter();
+    thrustFilter.type = 'lowpass';
+    thrustFilter.frequency.value = 200 + speedFactor * 100;  // Dynamic: Open filter as speed increases
+
+    const thrustGain = audioCtx.createGain();
+    thrustGain.gain.value = 0.1;
+
+    // Noise layer (looping from shared buffer)
+    thrustNoiseSource = audioCtx.createBufferSource();
+    thrustNoiseSource.buffer = sharedNoiseBuffer;
+    thrustNoiseSource.loop = true;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.value = 0.05;  // Subtle hiss
+
+    thrustSource.connect(thrustFilter);
+    thrustNoiseSource.connect(noiseGain).connect(thrustFilter);
+    thrustFilter.connect(thrustGain).connect(audioCtx.destination);
+
+    thrustSource.start();
+    thrustNoiseSource.start();
+}
+
+function stopThrust() {
+    if (thrustSource) {
+        thrustSource.stop();
+        thrustNoiseSource.stop();
+        thrustSource = null;
+        thrustNoiseSource = null;
+    }
+}
+
+// ADDED: New sound - Rock split ping (short high blip, dynamic by tier)
+function playSplitPing(tier) {
+    initAudio();
+    const now = audioCtx.currentTime;
+    const duration = 0.1;
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(600 + tier * 100, now);  // Higher pitch for smaller rocks
+    osc.frequency.exponentialRampToValueAtTime(200, now + duration);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + duration);
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -170,6 +244,17 @@ matrix2d.apply = (M, vec) => {
 // ACTORS & PHYSICS
 // ────────────────────────────────────────────────────────────────────────────────
 
+// see .log/edges-and-collisions.md
+function pairs(arr) {
+		var _pairs=[];
+    for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+            _pairs.push([arr[i], arr[j]]);
+        }
+    }
+    return _pairs;
+}
+
 const resolveBounce = (a, b) => {
     const normal = v.normalize(v.subtract(a.pos, b.pos));
     const relVel = v.subtract(a.velocity, b.velocity);
@@ -203,7 +288,6 @@ class Actor extends EventEmitter {
         });
     }
     isCollision(b) {
-        if (this.disposed) return false;
         if (v.size(v.subtract(this.pos, b.pos)) > (this.radius + b.radius)) return false;
         const bPoly = b.lines[0].map(idx => b.projection[idx]);
         return this.projection.some(pt => isPointInPoly(bPoly, pt));
@@ -211,7 +295,7 @@ class Actor extends EventEmitter {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
-// PARTICLE, MISSILE, ROCK, SHIP
+// PARTICLE, MISSLE, ROCK, SHIP
 // ────────────────────────────────────────────────────────────────────────────────
 
 class Particle extends Actor {
@@ -280,13 +364,14 @@ class Rock extends Actor {
         this.angle += this.angVel * t;
     }
     split(impactVel) {
-        if (this.disposed) return;
         const debrisDir = v.scale(0.3, impactVel || [0,0]);
         for (let i = 0; i < this.tier * 4; i++) {
             const pVel = v.add(debrisDir, [Math.random()*300-150, Math.random()*300-150]);
             this.emit('spawn', new Particle(this.pos, pVel, 0.6, "#789"));
         }
         if (this.tier > 1) {
+            // ADDED: Play split ping when spawning children
+            playSplitPing(this.tier);
             for (let i = 0; i < 2; i++) {
                 const offset = v.scale(this.radius * 0.6, [i ? 1 : -1, i ? 1 : -1]);
                 const newVel = v.add(this.velocity, [Math.random()*160-80, Math.random()*160-80]);
@@ -306,7 +391,7 @@ class Ship extends Actor {
         this.detectCollisions = true;
 
         this.on('collision', other => {
-            if (other instanceof Rock && !this.disposed) {
+            if (other instanceof Rock) {
                 playExplosion(2.0);
                 for (let i = 0; i < 40; i++) {
                     const pVel = [Math.random()*800-400, Math.random()*800-400];
@@ -318,7 +403,6 @@ class Ship extends Actor {
         });
     }
     fire() {
-        if (this.disposed) return;
         playLaser();
         const muz = v.add(this.pos, matrix2d.apply(matrix2d.rotate(this.angle), [30,0]));
         this.emit('spawn', new Missle(muz, this.angle, this.velocity));
@@ -334,7 +418,7 @@ const Game = function() {
     const ctx = canvas.getContext('2d');
     let player, deathPos;
 
-    const game = {
+    const game = Object.assign(new EventEmitter(),{
         actors: [],
         stars: [],
         controls: { up: false },
@@ -342,7 +426,7 @@ const Game = function() {
         screen: { zoom: 1, shake: 0 },
         lastTime: 0,
         state: "play"
-    };
+    });
 
     for (let i = 0; i < 150; i++) {
         game.stars.push({
@@ -392,6 +476,8 @@ const Game = function() {
             if (v.size(rel) > 0) player.angle = v.angle(rel);
 
             if (game.controls.up) {
+                // ADDED: Start/update thrust sound (dynamic with velocity)
+                startThrust(player.velocity);
                 game.screen.shake = 3;
                 const acc = v.scale(900 * dt, [Math.cos(player.angle), Math.sin(player.angle)]);
                 player.velocity = v.add(player.velocity, acc);
@@ -400,10 +486,16 @@ const Game = function() {
                     v.add(player.velocity, v.scale(-250, [Math.cos(player.angle + (Math.random()-0.5)*0.3), Math.sin(player.angle)])),
                     0.3
                 ));
+            } else {
+                // ADDED: Stop thrust sound when not accelerating
+                stopThrust();
             }
 
             player.velocity = v.scale(0.992, player.velocity);
             player.pos = v.add(player.pos, v.scale(dt, player.velocity));
+        } else {
+            // ADDED: Ensure thrust stops on death/gameover
+            stopThrust();
         }
 
         const targetPos = game.state === "play" ? player.pos : deathPos;
@@ -438,19 +530,32 @@ const Game = function() {
         });
 
         
-         const colliders = game.actors.filter(a => a.detectCollisions);
-        for(var i=0; i<colliders.length; i++) {
-            for(var j=0; j<colliders.length; j++) {
-                if(i!=j) {
-                    var a = colliders[i]; var b = colliders[j];    
+        const colliders = game.actors.filter(a => a.detectCollisions);
+        
+        // Collision test combinations (pairs finds all edges =total number of edges in graph )
+        pairs(colliders).forEach(([a,b])=>{
+        		// ADDED: Check both directions to handle asymmetric collision (e.g., line points in poly)
+				    if (b.isCollision(a) || a.isCollision(b)) {
+				        a.emit('collision', b); 
+				        b.emit('collision', a); 
+				    }
+				})
+
+				//legacy code
+				/*
+        for(let i=0; i<colliders.length; i++) {
+            for(let j=i+1; j<colliders.length; j++) {
+                
+                		let a = colliders[i]; let b = colliders[j];    
                     if (a.isCollision(b)) {
                         a.emit('collision', b); 
                         b.emit('collision', a); 
                     }
-                }
                 
             }
         }
+        /* */
+        
 
         if (game.state === "gameover") {
             ctx.fillStyle = "#ff5722";
